@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Статьи</title>
+</head>
+<body>
+    <h1>Все статьи</h1>
+    {% for article in articles %}
+        <div>
+            <h2><a href="{% url 'article_detail' article.id %}">{{ article.title }}</a></h2>
+            <p>{{ article.content|truncatewords:30 }}</p>
+            <hr>
+        </div>
+    {% empty %}
+        <p>Нет доступных статей.</p>
+    {% endfor %}
+</body>
+</html>

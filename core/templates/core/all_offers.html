@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Все кредитные предложения</h2>
+<div class="row">
+    {% for offer in offers %}
+        <div class="col-md-6 mb-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">{{ offer.bank.name }}</h5>
+                    <p>{{ offer.credit_type.name }} | {{ offer.rate }}%</p>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}

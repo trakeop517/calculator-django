@@ -1,0 +1,203 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Кредитный калькулятор</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'core/style.css' %}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="/">Кредитный калькулятор</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="text-center my-4">
+            <h1 class="display-5 fw-bold">Сравнивайте кредитные предложения и рассчитывайте платежи онлайн</h1>
+            <p class="lead">Найдите выгодное предложение, рассчитайте ежемесячный платёж и читайте полезные статьи</p>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="card-title mb-0">🔥 Топ-5 выгодных кредитов</h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group list-group-flush">
+                            {% for offer in top_offers|slice:":5" %}
+                                <li class="list-group-item">
+                                    <strong>{{ offer.bank.name }}</strong><br>
+                                    {{ offer.credit_type.name }} | {{ offer.rate }}%<br>
+                                    <small>Срок: {{ offer.term_min }}–{{ offer.term_max }} мес.</small>
+                                </li>
+                            {% empty %}
+                                <li class="list-group-item text-muted">Нет данных</li>
+                            {% endfor %}
+                        </ul>
+                        <a href="{% url 'all_offers' %}" class="btn btn-outline-danger mt-3 w-100">
+                            Все предложения →
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="card-title mb-0">🧮 Кредитный калькулятор</h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" class="mb-3">
+                            {% csrf_token %}
+                            <div class="mb-2">
+                                <label class="form-label">Сумма кредита (₽):</label>
+                                <input type="number" name="amount" class="form-control" required>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label">Срок (мес.):</label>
+                                <input type="number" name="term" class="form-control" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Процентная ставка (%):</label>
+                                <input type="number" step="0.01" name="rate" class="form-control" required>
+                            </div>
+                            <button type="submit" class="btn btn-success w-100">Рассчитать</button>
+                        </form>
+                        
+                        {% if result %}
+                            <div class="alert alert-info mt-3">
+                                <strong>Ежемесячный платёж:</strong> {{ result.monthly_payment }} ₽
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="card-title mb-0">📰 Последние статьи</h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-unstyled">
+                            {% for article in latest_articles|slice:":5" %}
+                                <li class="mb-3">
+                                    <img src="{{ article.image_url }}" 
+                                         alt="{{ article.title }}" 
+                                         width="80" 
+                                         class="float-start me-3 rounded">
+                                    <a href="{% url 'article_detail' article.id %}" class="text-decoration-none">
+                                        {{ article.title|truncatechars:40 }}
+                                    </a>
+                                    <p class="text-muted small mb-0">{{ article.published_at|date:"d.m.Y" }}</p>
+                                </li>
+                            {% empty %}
+                                <li class="text-muted">Статей пока нет</li>
+                            {% endfor %}
+                        </ul>
+                        <a href="{% url 'articles' %}" class="btn btn-outline-info mt-3 w-100">
+                            Все статьи →
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="mt-5">
+        <h4 class="mb-3">💬 Отзывы клиентов</h4>
+        <div class="row">
+            {% for review in latest_reviews %}
+            <div class="col-md-4">
+                <blockquote class="blockquote border rounded p-3 h-100 shadow-sm">
+                <p>{{ review.text|truncatewords:30 }}</p>
+                <footer class="blockquote-footer">{{ review.user.name }} <cite title="Source Title">{{ review.created_at|date:"d.m.Y" }}</cite></footer>
+                </blockquote>
+            </div>
+            {% empty %}
+            <p class="text-muted">Отзывов пока нет</p>
+            {% endfor %}
+        </div>
+        </div>
+        <div class="mt-4">
+            <h5>📝 Оставьте свой отзыв</h5>
+            <form method="post" class="card p-3 shadow-sm">
+                {% csrf_token %}
+                {{ review_form.as_p }}
+                <button type="submit" class="btn btn-outline-primary">Отправить</button>
+            </form>
+        </div>
+        <div class="row mt-5">
+            <div class="col-md-10 offset-md-1">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">🔍 Поиск кредитов и банков</h5>
+                        <form action="{% url 'search_offers' %}" method="get" class="d-flex gap-2">
+                            <input type="text" name="q" placeholder="Введите банк или тип кредита" class="form-control">
+                            <button type="submit" class="btn btn-primary">Найти</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </div>
+        <div class="row justify-content-center mt-5">
+            <div class="col-md-8 col-lg-6">
+                <div class="card shadow">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0 text-center">📊 Ваше мнение</h4>
+                    </div>
+                    
+                    <div class="card-body">
+                        {% if poll %}
+                            <form method="post">
+                                {% csrf_token %}
+                                <h5 class="text-center mb-4">{{ poll.question }}</h5>
+                                
+                                <div class="list-group mb-4">
+                                    {% for option in poll.options.all %}
+                                        <label class="list-group-item d-flex align-items-center">
+                                            <input type="radio" 
+                                                name="choice" 
+                                                value="{{ option.id }}"
+                                                class="form-check-input me-3" 
+                                                required>
+                                            <div class="w-100">
+                                                <div class="d-flex justify-content-between">
+                                                    <span>{{ option.text }}</span>
+                                                    <span class="badge bg-primary rounded-pill">{{ option.votes }}</span>
+                                                </div>
+                                                <div class="progress mt-2" style="height: 5px;">
+                                                    <div class="progress-bar" 
+                                                        role="progressbar" 
+                                                        style="width: {% widthratio option.votes poll.total_votes 100 %}%">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </label>
+                                    {% endfor %}
+                                </div>
+                                
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-primary btn-lg">
+                                        <i class="bi bi-check-circle me-2"></i>Проголосовать
+                                    </button>
+                                </div>
+                            </form>
+                        {% else %}
+                            <div class="alert alert-info text-center mb-0">
+                                Нет активных опросов
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>

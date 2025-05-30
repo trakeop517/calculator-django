@@ -3,12 +3,10 @@
 from django.contrib import admin
 from .models import (
     Bank, CreditType, CreditOffer, Article, User,
-    Comparison, FavoriteOffer, ActionLog, BudgetPlan
+    Comparison, FavoriteOffer, ActionLog, BudgetPlan, Poll, PollOption
 )
 
-# ———————————————— Инлайн-классы ————————————————
-
-class CreditOfferInline(admin.TabularInline):  # ✅ Определение добавлено
+class CreditOfferInline(admin.TabularInline):  
     model = CreditOffer
     extra = 0
     classes = ['collapse']
@@ -32,13 +30,11 @@ class BudgetPlanInline(admin.TabularInline):
     model = BudgetPlan
     extra = 0
 
-# ———————————————— Админ-классы для моделей ————————————————
-
 @admin.register(Bank)
 class BankAdmin(admin.ModelAdmin):
     list_display = ('name', 'license_no')
     search_fields = ('name',)
-    inlines = [CreditOfferInline]  # ✅ Теперь класс определен
+    inlines = [CreditOfferInline]  
     list_display_links = ('name',)
     fieldsets = (
         (None, {
@@ -113,3 +109,16 @@ class BudgetPlanAdmin(admin.ModelAdmin):
     date_hierarchy = 'created_at'
     raw_id_fields = ('user',)
     search_fields = ('user__name',)
+
+class PollOptionInline(admin.TabularInline):
+    model = PollOption
+    extra = 1 
+
+@admin.register(Poll)
+class PollAdmin(admin.ModelAdmin):
+    inlines = [PollOptionInline] 
+    list_display = ('question', 'created_at') 
+
+@admin.register(PollOption)
+class PollOptionAdmin(admin.ModelAdmin):
+    list_display = ('text', 'votes', 'poll') 

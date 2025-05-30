@@ -1,7 +1,7 @@
 # core/models.py
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-
+from django.utils import timezone
 class Bank(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=100, verbose_name=_('Название'))
@@ -50,7 +50,7 @@ class Article(models.Model):
     title = models.CharField(max_length=255, verbose_name=_('Заголовок'))
     content = models.TextField(verbose_name=_('Содержание'))
     image_url = models.TextField(verbose_name=_('URL изображения'))
-    published_at = models.DateTimeField(verbose_name=_('Дата публикации'))
+    published_at = models.DateTimeField(auto_now_add=True, verbose_name=_('Дата публикации'))
 
     class Meta:
         verbose_name = _('Статья')
@@ -126,3 +126,46 @@ class BudgetPlan(models.Model):
 
     def __str__(self):
         return f'{self.user} - {self.created_at}'
+    
+class Review(models.Model):
+    user = models.CharField(max_length=100)
+    text = models.TextField(verbose_name='Текст отзыва')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
+
+    class Meta:
+        verbose_name = 'Отзыв'
+        verbose_name_plural = 'Отзывы'
+
+    def __str__(self):
+        return f'{self.user.name} — отзыв'
+
+class Poll(models.Model):
+    question = models.CharField(max_length=255)
+    created_at = models.DateTimeField(default=timezone.now)
+    
+    @property
+    def total_votes(self):
+        return sum(option.votes for option in self.options.all())
+    
+    def __str__(self):
+        return self.question
+
+class Choice(models.Model):
+    poll = models.ForeignKey(Poll, related_name='choices', on_delete=models.CASCADE)
+    text = models.CharField(max_length=255)
+    votes = models.IntegerField(default=0)
+
+    def __str__(self):
+        return self.text
+
+class PollOption(models.Model):
+    poll = models.ForeignKey(Poll, on_delete=models.CASCADE, related_name='options')
+    text = models.CharField(max_length=255)
+    votes = models.IntegerField(default=0)
+
+    class Meta:
+        verbose_name = 'Вариант ответа'
+        verbose_name_plural = 'Варианты ответов'
+
+    def __str__(self):
+        return self.text
