@@ -1,16 +1,15 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
+{% block body_class %}page-offers{% endblock %}
 {% block content %}
-<h2>Все кредитные предложения</h2>
-<div class="row">
-    {% for offer in offers %}
-        <div class="col-md-6 mb-3">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">{{ offer.bank.name }}</h5>
-                    <p>{{ offer.credit_type.name }} | {{ offer.rate }}%</p>
-                </div>
-            </div>
-        </div>
-    {% endfor %}
+<h1 class="page-title">Кредитные предложения</h1>
+<div class="card-grid">
+  {% for offer in offers %}
+    <div class="card">
+      <h2>{{ offer.name }}</h2>
+      <p><strong>Банк:</strong> {{ offer.bank.name }}</p>
+      <p><strong>Ставка:</strong> {{ offer.rate }}%</p>
+      <a href="#" class="btn">Подробнее</a>
+    </div>
+  {% endfor %}
 </div>
 {% endblock %}

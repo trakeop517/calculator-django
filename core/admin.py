@@ -3,8 +3,10 @@
 from django.contrib import admin
 from .models import (
     Bank, CreditType, CreditOffer, Article, User,
-    Comparison, FavoriteOffer, ActionLog, BudgetPlan, Poll, PollOption
+    CreditComparison, FavoriteOffer, ActionLog, BudgetItem, Poll, PollOption
 )
+from django.contrib.auth.admin import UserAdmin
+from django.utils.translation import gettext_lazy as _
 
 class CreditOfferInline(admin.TabularInline):  
     model = CreditOffer
@@ -13,7 +15,7 @@ class CreditOfferInline(admin.TabularInline):
     raw_id_fields = ('bank', 'credit_type')
 
 class ComparisonInline(admin.TabularInline):
-    model = Comparison
+    model = CreditComparison
     extra = 0
     autocomplete_fields = ('offer',)
 
@@ -27,7 +29,7 @@ class ActionLogInline(admin.TabularInline):
     extra = 0
 
 class BudgetPlanInline(admin.TabularInline):
-    model = BudgetPlan
+    model = BudgetItem
     extra = 0
 
 @admin.register(Bank)
@@ -74,23 +76,20 @@ class ArticleAdmin(admin.ModelAdmin):
     )
 
 @admin.register(User)
-class UserAdmin(admin.ModelAdmin):
-    list_display = ('name', 'email', 'created_at')
-    search_fields = ('name', 'email')
-    date_hierarchy = 'created_at'
-    inlines = [
-        ComparisonInline,
-        FavoriteOfferInline,
-        ActionLogInline,
-        BudgetPlanInline,
-    ]
-    readonly_fields = ('created_at',)
+class CustomUserAdmin(UserAdmin):
+    list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff')
     fieldsets = (
-        (None, {
-            'fields': ('name', 'email', 'password')
+        (None, {'fields': ('username', 'password')}),
+        (_('Personal info'), {'fields': ('first_name', 'last_name', 'email', 'phone', 'avatar')}),
+        (_('Permissions'), {
+            'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions'),
         }),
-        ('Даты', {
-            'fields': ('created_at',)
+        (_('Important dates'), {'fields': ('last_login', 'date_joined')}),
+    )
+    add_fieldsets = (
+        (None, {
+            'classes': ('wide',),
+            'fields': ('username', 'email', 'password1', 'password2'),
         }),
     )
 
@@ -102,13 +101,18 @@ class ActionLogAdmin(admin.ModelAdmin):
     raw_id_fields = ('user',)
     search_fields = ('action_type',)
 
-@admin.register(BudgetPlan)
-class BudgetPlanAdmin(admin.ModelAdmin):
-    list_display = ('user', 'income', 'expenses', 'created_at')
-    list_filter = ('user',)
-    date_hierarchy = 'created_at'
-    raw_id_fields = ('user',)
-    search_fields = ('user__name',)
+@admin.register(BudgetItem)
+class BudgetItemAdmin(admin.ModelAdmin):
+    list_display = ('user', 'name', 'amount', 'item_type', 'date')
+    list_filter = ('item_type', 'date', 'user')
+    search_fields = ('name', 'user__username')
+    date_hierarchy = 'date'  # Используем поле date вместо created_at
+    
+    fieldsets = (
+        (None, {
+            'fields': ('user', 'name', 'amount', 'item_type', 'date')
+        }),
+    )
 
 class PollOptionInline(admin.TabularInline):
     model = PollOption

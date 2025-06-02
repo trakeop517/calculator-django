@@ -1,18 +1,15 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Статьи</title>
-</head>
-<body>
-    <h1>Все статьи</h1>
-    {% for article in articles %}
-        <div>
-            <h2><a href="{% url 'article_detail' article.id %}">{{ article.title }}</a></h2>
-            <p>{{ article.content|truncatewords:30 }}</p>
-            <hr>
-        </div>
-    {% empty %}
-        <p>Нет доступных статей.</p>
-    {% endfor %}
-</body>
-</html>
+{% extends 'base.html' %}
+{% block body_class %}page-articles{% endblock %}
+{% block content %}
+<h1 class="page-title">Полезные статьи</h1>
+<div class="card-list">
+  {% for article in articles %}
+    <div class="card">
+      <h2>{{ article.title }}</h2>
+      <p class="date">{{ article.published_at|date:"d.m.Y" }}</p>
+      <p>{{ article.content|truncatewords:30 }}</p>
+      <a href="{% url 'article_detail' article.id %}" class="btn">Читать далее</a>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Личный кабинет{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+
+        <!-- Профиль пользователя -->
+        <div class="col-md-4 mb-4">
+            <div class="card text-center">
+                {% if user.avatar %}
+                    <img src="{{ user.avatar.url }}" class="card-img-top" alt="Аватар">
+                {% else %}
+                    <img src="{% static 'core/images/default_avatar.png' %}" class="card-img-top" alt="Аватар">
+                {% endif %}
+                <div class="card-body">
+                    <h4 class="card-title">{{ user.username }}</h4>
+                    <p>{{ user.email }}</p>
+                    <p>Зарегистрирован: {{ user.date_joined|date:"d.m.Y H:i" }}</p>
+                    <a href="{% url 'profile' %}" class="btn btn-primary">Редактировать профиль</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Бюджет -->
+        <div class="card mb-4">
+            <div class="card-header bg-info text-white">
+                <h5>Бюджет</h5>
+            </div>
+            <div class="card-body">
+                <a href="{% url 'budget_add' %}" class="btn btn-success btn-sm mb-3">+ Новая запись</a>
+
+                {% if budget_items %}
+                    <ul class="list-group">
+                        {% for item in budget_items %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>
+                                    {{ item.name }}
+                                    <small class="text-muted">{{ item.get_item_type_display }}</small>
+                                </span>
+                                <span class="badge {% if item.item_type == 'income' %}bg-success{% else %}bg-danger{% endif %}">
+                                    {% if item.item_type == 'income' %}+{% else %}-{% endif %}{{ item.amount }}
+                                </span>
+                                <span>
+                                    <a href="{% url 'budget_edit' item.id %}" class="btn btn-outline-primary btn-sm">Редактировать</a>
+                                    <a href="#" data-bs-toggle="modal" data-bs-target="#deleteModal-{{ item.id }}" class="btn btn-outline-danger btn-sm">Удалить</a>
+                                </span>
+                            </li>
+                            <div class="modal fade" id="deleteModal-{{ item.id }}" tabindex="-1">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Удалить запись?</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            Вы действительно хотите удалить "{{ item.name }}"?
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                                            <a href="{% url 'budget_delete' item.id %}" class="btn btn-danger">Удалить</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p>Нет записей в бюджете.</p>
+                {% endif %}
+            </div>
+        </div>
+        <!-- График доходов/расходов -->
+        <div class="card mb-4">
+            <div class="card-header bg-light">
+                <h5>Доходы и расходы</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="budgetChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+
+        <script>
+            const ctx = document.getElementById('budgetChart').getContext('2d');
+            const budgetChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: ['Доходы', 'Расходы'],
+                    datasets: [{
+                        label: 'Бюджет',
+                        data: [{{ income_total }}, {{ expense_total }}],
+                        backgroundColor: ['#4CAF50', '#F44336']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.label}: ${context.parsed} ₽`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        </script>
+        <!-- Статистика по кредитам -->
+        {% if favorites %}
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5>Статистика по кредитам</h5>
+            </div>
+            <div class="card-body">
+                <p>Избранных предложений: <strong>{{ favorites.count }}</strong></p>
+                {% with reviews=reviews|default:"" %}
+                    <p>Оставленных отзывов: <strong>{{ user.reviews.count }}</strong></p>
+                {% endwith %}
+            </div>
+        </div>
+        {% endif %}
+        <!-- История расчетов -->
+        {% if calculations %}
+        <div class="card mb-4">
+            <div class="card-header bg-dark text-white">
+                <h5>Последние расчёты</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    {% for calc in calculations %}
+                        <li class="list-group-item">
+                            {{ calc.amount }} ₽ / {{ calc.term }} мес → {{ calc.result }} ₽/мес
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+            <!-- Избранные предложения -->
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-white">
+                    <h5>Избранные кредиты</h5>
+                </div>
+                <div class="card-body">
+                    {% if favorites %}
+                        <ul class="list-group">
+                            {% for fav in favorites %}
+                                <li class="list-group-item">
+                                    {{ fav.offer.bank }} — {{ fav.offer.credit_type }} (ставка {{ fav.offer.rate }}%)
+                                </li>
+                            {% empty %}
+                                <p>Нет избранных предложений.</p>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p>Вы еще не добавили предложения в избранное.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- История расчетов -->
+            <div class="card mb-4">
+                <div class="card-header bg-secondary text-white">
+                    <h5>История расчетов</h5>
+                </div>
+                <div class="card-body">
+                    {% if calculations %}
+                        <ul class="list-group">
+                            {% for calc in calculations %}
+                                <li class="list-group-item">
+                                    {{ calc.amount }} ₽, {{ calc.term }} мес. → {{ calc.result }} ₽/мес.
+                                </li>
+                            {% empty %}
+                                <p>Нет истории расчетов.</p>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p>Вы еще не делали расчетов.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Активный опрос -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5>Опрос дня</h5>
+                </div>
+                <div class="card-body">
+                    {% if active_poll %}
+                        <h6>{{ active_poll.question }}</h6>
+                        <form method="post" action="{% url 'vote_poll' active_poll.id %}">
+                            {% csrf_token %}
+                            {% for option in poll_options %}
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="choice" value="{{ option.id }}">
+                                    <label class="form-check-label">{{ option.text }}</label>
+                                </div>
+                            {% endfor %}
+                            <button type="submit" class="btn btn-sm btn-primary mt-2">Проголосовать</button>
+                        </form>
+                    {% else %}
+                        <p>На данный момент нет активных опросов.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Последние действия -->
+            <div class="card mb-4">
+                <div class="card-header bg-dark text-white">
+                    <h5>Ваша активность</h5>
+                </div>
+                <div class="card-body">
+                    {% if actions %}
+                        <ul class="list-group">
+                            {% for action in actions %}
+                                <li class="list-group-item">
+                                    <small>{{ action.timestamp|date:"d.m.Y H:i" }}</small> — {{ action.action_type }}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p>Нет записей об активности.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

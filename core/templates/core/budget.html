@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Мой бюджет</h2>
+    
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <h5>Доходы</h5>
+                    <p class="h4">{{ income }} ₽</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white bg-danger">
+                <div class="card-body">
+                    <h5>Расходы</h5>
+                    <p class="h4">{{ expenses }} ₽</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-light">
+                <div class="card-body">
+                    <h5>Баланс</h5>
+                    <p class="h4">{{ balance }} ₽</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <form method="post" class="mb-4">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-primary">Добавить</button>
+    </form>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Дата</th>
+                <th>Наименование</th>
+                <th>Сумма</th>
+                <th>Тип</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td>{{ item.date|date:"d.m.Y" }}</td>
+                <td>{{ item.name }}</td>
+                <td>{{ item.amount }} ₽</td>
+                <td>{{ item.get_item_type_display }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
