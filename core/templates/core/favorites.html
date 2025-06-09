@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Избранные кредиты{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4"><i class="bi bi-star-fill"></i> Избранные кредитные предложения</h2>
+    
+    {% if favorites %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>Банк</th>
+                        <th>Тип кредита</th>
+                        <th>Ставка</th>
+                        <th>Сумма</th>
+                        <th>Срок</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for fav in favorites %}
+                    <tr>
+                        <td>{{ fav.offer.bank.name }}</td>
+                        <td>{{ fav.offer.credit_type.name }}</td>
+                        <td>{{ fav.offer.rate }}%</td>
+                        <td>
+                            {{ fav.offer.amount_min|floatformat:"0" }} - 
+                            {{ fav.offer.amount_max|floatformat:"0" }} ₽
+                        </td>
+                        <td>{{ fav.offer.term_min }} - {{ fav.offer.term_max }} мес.</td>
+                        <td>
+                            <a href="{% url 'toggle_favorite' fav.offer.id %}" class="btn btn-sm btn-outline-danger">
+                                Удалить
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> У вас пока нет избранных кредитных предложений.
+            <a href="{% url 'all_offers' %}" class="alert-link">Посмотреть все предложения</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

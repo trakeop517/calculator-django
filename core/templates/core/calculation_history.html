@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+
+{% block title %}История расчетов{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4"><i class="bi bi-clock-history"></i> История ваших расчетов</h2>
+    
+    {% if calculations %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>Дата</th>
+                        <th>Сумма</th>
+                        <th>Срок</th>
+                        <th>Ставка</th>
+                        <th>Платеж</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for calc in calculations %}
+                    <tr>
+                        <td>{{ calc.created_at|date:"d.m.Y H:i" }}</td>
+                        <td>{{ calc.amount|floatformat:"0" }} ₽</td>
+                        <td>{{ calc.term }} мес.</td>
+                        <td>{{ calc.rate }}%</td>
+                        <td>
+                            {% if calc.monthly_payment %}
+                                {{ calc.monthly_payment|floatformat:"2" }} ₽
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> У вас пока нет сохраненных расчетов.
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

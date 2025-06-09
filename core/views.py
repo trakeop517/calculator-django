@@ -10,12 +10,12 @@ from .forms import (
     RegisterForm, LoginForm, ReviewForm,
     PollForm, BudgetItemForm
 )
-
+import json
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
-@login_required
-def dashboard_view(request):
-    return render(request, 'core/dashboard.html')
+from django.http import HttpResponseRedirect
+from django.urls import reverse
+
 def login_view(request):
     if request.method == 'POST':
         form = LoginForm(request, data=request.POST)
@@ -45,7 +45,7 @@ def register_view(request):
 def logout_view(request):
     logout(request)
     return redirect('home')
-
+from django.db.models import Avg, Count
 def home(request):
     top_offers = CreditOffer.objects.order_by('rate')[:5]
     latest_articles = Article.objects.order_by('-published_at')[:5]
@@ -55,8 +55,21 @@ def home(request):
     result = None
     review_form = ReviewForm()
     poll_form = PollForm(poll=poll) if poll else None
-
+    avg_top_rate = top_offers.aggregate(avg_rate=Avg('rate'))['avg_rate'] or 0
+    total_articles = Article.objects.count()
+    editing_review_id = None
+    if 'edit_review' in request.GET:
+        editing_review_id = request.GET['edit_review']
     if request.method == 'POST':
+        if 'review_id' in request.POST:
+            review_id = request.POST['review_id']
+            try:
+                review = Review.objects.get(id=review_id, user=request.user)
+                review.text = request.POST.get('text', '')
+                review.save()
+                return HttpResponseRedirect(reverse('home'))  
+            except Review.DoesNotExist:
+                pass
         if 'amount' in request.POST:
             try:
                 amount = float(request.POST.get('amount'))
@@ -92,7 +105,10 @@ def home(request):
         'poll_form': poll_form,
         'result': result,
         'review_form': review_form,
-        'user': request.user
+        'user': request.user,
+        'avg_top_rate': round(avg_top_rate, 2),
+        'total_articles': total_articles,
+        'editing_review_id': editing_review_id,
     })
 
 def all_offers(request):
@@ -129,9 +145,27 @@ def poll_view(request, poll_id):
 
     return render(request, 'core/poll.html', {'poll': poll, 'form': form, 'user': request.user})
 
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, redirect
+from .forms import ProfileForm
+
 @login_required
 def profile_view(request):
-    return render(request, 'core/profile.html', {'user': request.user})
+    user = request.user
+
+    if request.method == 'POST':
+        form = ProfileForm(request.POST, request.FILES, instance=user)
+        if form.is_valid():
+            form.save()
+            return redirect('profile')  
+    else:
+        form = ProfileForm(instance=user)
+
+    return render(request, 'core/profile.html', {
+        'form': form,
+        'user': user,
+    })
+
 
 @login_required
 def add_to_favorites(request, offer_id):
@@ -143,7 +177,48 @@ def add_to_favorites(request, offer_id):
     if not created:
         favorite.delete()
     return redirect('offer_detail', offer_id=offer.id)
+def compare_offers(request):
+    offers = CreditOffer.objects.all().select_related('bank', 'credit_type')
+    return render(request, 'core/compare.html', {'offers': offers})
+def save_calculation(request):
+    if request.method == 'POST':
+        try:
+            CalculationHistory.objects.create(
+                user=request.user,
+                amount=request.POST.get('amount'),
+                term=request.POST.get('term'),
+                rate=request.POST.get('rate'),
+                result=request.POST.get('result')
+            )
+            messages.success(request, 'Расчет успешно сохранен в историю')
+        except Exception as e:
+            messages.error(request, f'Ошибка при сохранении: {str(e)}')
+        return redirect('offer_detail', offer_id=request.POST.get('offer_id'))
+from django.shortcuts import render, get_object_or_404
+from .models import CreditOffer
 
+def compare_offers(request):
+    offers = CreditOffer.objects.all().select_related('bank', 'credit_type')
+    return render(request, 'core/compare.html', {'offers': offers})
+
+def compare_detail(request, offer1_id, offer2_id):
+    offer1 = get_object_or_404(CreditOffer, id=offer1_id)
+    offer2 = get_object_or_404(CreditOffer, id=offer2_id)
+    def calculate_payment(offer, amount=100000, term=12):
+        monthly_rate = offer.rate / 12 / 100
+        return (amount * monthly_rate) / (1 - (1 + monthly_rate) ** -term)
+    
+    context = {
+        'offer1': offer1,
+        'offer2': offer2,
+        'payment1': round(calculate_payment(offer1), 2),
+        'payment2': round(calculate_payment(offer2), 2),
+    }
+    return render(request, 'core/compare_detail.html', context)
+@login_required
+def favorites(request):
+    favorites = FavoriteOffer.objects.filter(user=request.user).select_related('offer__bank', 'offer__credit_type')
+    return render(request, 'core/favorites.html', {'favorites': favorites})
 @login_required
 def calculation_history(request):
     history = CalculationHistory.objects.filter(user=request.user).order_by('-created_at')
@@ -190,23 +265,44 @@ def toggle_favorite(request, offer_id):
 def favorites(request):
     favorites = FavoriteOffer.objects.filter(user=request.user).select_related('offer')
     return render(request, 'core/favorites.html', {'favorites': favorites, 'user': request.user})
-
 def offer_detail(request, offer_id):
     offer = get_object_or_404(CreditOffer, id=offer_id)
-    
-    context = {
+    reviews = Review.objects.filter(offer=offer).order_by('-created_at')
+    review_form = ReviewForm()
+    if request.method == 'POST':
+        if 'review_id' in request.POST:
+            review_id = request.POST.get('review_id')
+            try:
+                review = Review.objects.get(id=review_id, user=request.user)
+                review.text = request.POST.get('text')
+                review.save()
+                return JsonResponse({
+                    'success': True,
+                    'text': review.text
+                })
+            except Review.DoesNotExist:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Отзыв не найден'
+                })
+
+    if request.method == 'POST' and 'text' in request.POST:
+        form = ReviewForm(request.POST)
+        if form.is_valid():
+            review = form.save(commit=False)
+            review.offer = offer
+            review.user = request.user
+            review.save()
+            return redirect('offer_detail', offer_id=offer_id)
+    else:
+        form = ReviewForm()
+
+    return render(request, 'core/offer_detail.html', {
         'offer': offer,
-        'reviews': Review.objects.filter(offer=offer).order_by('-created_at'),
-        'user': request.user,  
-    }
-    
-    if request.user.is_authenticated:
-        context['is_favorite'] = FavoriteOffer.objects.filter(
-            user=request.user,
-            offer=offer
-        ).exists()
-    
-    return render(request, 'core/offer_detail.html', context)
+        'reviews': reviews,
+        'review_form': review_form,
+        'user': request.user
+    })
 
 def auth_test(request):
     return render(request, 'core/auth_test.html', {
@@ -219,54 +315,99 @@ def test_static(request):
 
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
-from .models import BudgetItem, FavoriteOffer, CalculationHistory, ActionLog, Poll
-
-from django.db.models import Sum
+from django.db.models import Sum, Q
+from django.utils import timezone
+import json
+from .models import (
+    BudgetItem, 
+    FavoriteOffer, 
+    CalculationHistory, 
+    ActionLog, 
+    Poll
+)
 
 @login_required
 def dashboard_view(request):
-    # Доходы и расходы
-    # Получаем все записи для подсчётов
-    all_budget_items = BudgetItem.objects.filter(user=request.user)
+    user = request.user
+    totals = BudgetItem.objects.filter(user=user).aggregate(
+        income=Sum('amount', filter=Q(item_type='income')),
+        expense=Sum('amount', filter=Q(item_type='expense'))
+    )
+    
+    income = float(totals['income'] or 0)
+    expense = float(totals['expense'] or 0)
+    balance = income - expense
 
-    # Берём последние 5 для отображения на странице
-    budget_items = all_budget_items.order_by('-date')[:5]
-
-    # Подсчёт доходов и расходов по всем записям
-    income_total = all_budget_items.filter(item_type='income').aggregate(Sum('amount'))['amount__sum'] or 0
-    expense_total = all_budget_items.filter(item_type='expense').aggregate(Sum('amount'))['amount__sum'] or 0
-
-
-    # Избранные предложения
-    favorites = FavoriteOffer.objects.filter(user=request.user).select_related('offer__bank', 'offer__credit_type')
-
-    # История расчетов
-    calculations = CalculationHistory.objects.filter(user=request.user).order_by('-created_at')[:5]
-
-    # Последние действия
-    actions = ActionLog.objects.filter(user=request.user).order_by('-timestamp')[:5]
-
-    # Активный опрос
-    active_poll = Poll.objects.order_by('-created_at').first()
-    poll_options = active_poll.options.all() if active_poll else None
-
-    context = {
-        'budget_items': budget_items,
-        'income_total': income_total,
-        'expense_total': expense_total,
-        'favorites': favorites,
-        'calculations': calculations,
-        'actions': actions,
-        'active_poll': active_poll,
-        'poll_options': poll_options,
+    chart_data = {
+        'income': income,
+        'expense': expense,
+        'balance': balance
     }
+    calculation_form = CalculationForm()
+    calculation_result = None
+    favorites_count = FavoriteOffer.objects.filter(user=user).count()
+    total_payments = CalculationHistory.objects.filter(user=user).aggregate(total=Sum('result'))['total'] or 0
+    if request.method == 'POST' and 'calculate' in request.POST:
+        calculation_form = CalculationForm(request.POST)
+        if calculation_form.is_valid():
+            amount = calculation_form.cleaned_data['amount']
+            term = calculation_form.cleaned_data['term']
+            rate = calculation_form.cleaned_data['rate']
+            monthly_rate = rate / 12 / 100
+            monthly_payment = (amount * monthly_rate) / (1 - (1 + monthly_rate) ** -term)
+            CalculationHistory.objects.create(
+                user=user,
+                amount=amount,
+                term=term,
+                rate=rate,
+                result=round(monthly_payment, 2)
+            )
+            
+            calculation_result = {
+                'monthly': round(monthly_payment, 2),
+                'total': round(monthly_payment * term, 2),
+                'overpayment': round(monthly_payment * term - amount, 2)
+            }
+            totals = BudgetItem.objects.filter(user=user).aggregate(
+                income=Sum('amount', filter=Q(item_type='income')),
+                expense=Sum('amount', filter=Q(item_type='expense'))
+            )
+            
+            result = {
+                'monthly_payment': round(monthly_payment, 2),
+                'total_payment': round(monthly_payment * term, 2),
+                'overpayment': round(monthly_payment * term - amount, 2)
+            }
+    context = {
+        'budget_items': BudgetItem.objects.filter(user=request.user).order_by('-date')[:5],
+        'income_total': income,
+        'expense_total': expense,
+        'balance': balance,
+        'chart_data_json': json.dumps(chart_data),
+        
+        'favorites': FavoriteOffer.objects.filter(user=user)
+                       .select_related('offer__bank', 'offer__credit_type')[:5],
 
+        'calculations': CalculationHistory.objects.filter(user=user)
+                       .order_by('-created_at')[:5],
+        
+        'actions': ActionLog.objects.filter(user=user)
+                   .order_by('-timestamp')[:5],
+        
+        'active_poll': Poll.objects.order_by('-created_at').first(),
+        
+        'user': user,
+        'now': timezone.now(),
+        'calculation_form': calculation_form,
+        'calculation_result': calculation_result,
+        'favorites_count': favorites_count,
+        'total_payments': total_payments
+    }
+    
     return render(request, 'core/dashboard.html', context)
-
 from django.shortcuts import get_object_or_404, redirect
 from .models import PollOption
 from django.contrib import messages
-
 def vote_poll(request, poll_id):
     if request.method == 'POST':
         selected_option = request.POST.get('choice')
@@ -315,3 +456,120 @@ def budget_delete(request, pk):
         item.delete()
         return redirect('dashboard')
     return render(request, 'core/budget_confirm_delete.html', {'item': item})
+
+from django import forms
+
+class CalculationForm(forms.Form):
+    amount = forms.FloatField(
+        label='Сумма кредита',
+        min_value=1000,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': '10 000 ₽'})
+    )
+    term = forms.IntegerField(
+        label='Срок',
+        min_value=1,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': '12 мес.'})
+    )
+    rate = forms.FloatField(
+        label='Ставка',
+        min_value=0.1,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': '15%'})
+    )
+
+
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt  
+
+@require_POST
+def calculate_credit_ajax(request):
+    try:
+        amount = float(request.POST.get('amount'))
+        term = int(request.POST.get('term'))
+        rate = float(request.POST.get('rate'))
+
+        monthly_rate = rate / 12 / 100
+        monthly_payment = (amount * monthly_rate) / (1 - (1 + monthly_rate) ** -term)
+        total_payment = monthly_payment * term
+        overpayment = total_payment - amount
+
+        return JsonResponse({
+            'monthly': round(monthly_payment, 2),
+            'total': round(total_payment, 2),
+            'overpayment': round(overpayment, 2),
+        })
+    except (ValueError, TypeError):
+        return JsonResponse({'error': 'Неверные данные'}, status=400)
+    
+
+from django.shortcuts import render
+from .models import CalculationHistory
+
+def calculation_history(request):
+    calculations = CalculationHistory.objects.filter(user=request.user).order_by('-created_at')
+    return render(request, 'core/calculation_history.html', {'calculations': calculations})
+
+from django.shortcuts import redirect, get_object_or_404, render
+from .models import Review, CreditOffer
+from .forms import ReviewForm
+from django.contrib.auth.decorators import login_required
+def repeat_calculation(request, calc_id):
+    calculation = get_object_or_404(CalculationHistory, id=calc_id, user=request.user)
+    return redirect('calculator')  
+@login_required
+def add_offer(request):
+    if request.method == 'POST':
+        form = CreditOfferForm(request.POST)
+        if form.is_valid():
+            offer = form.save(commit=False)
+            offer.user = request.user
+            offer.save()
+            return redirect('index')
+    else:
+        form = CreditOfferForm()
+    return render(request, 'core/offer_form.html', {'form': form})
+
+@login_required
+def add_review(request, offer_id):
+    offer = get_object_or_404(CreditOffer, id=offer_id)
+
+    if request.method == 'POST':
+        form = ReviewForm(request.POST)
+        if form.is_valid():
+            review = form.save(commit=False)
+            review.offer = offer
+            review.user = request.user
+            review.save()
+
+    return redirect('index')
+from django.urls import reverse
+@login_required
+def edit_review(request, review_id):
+    review = get_object_or_404(Review, id=review_id)
+    if request.method == 'POST':
+        form = ReviewForm(request.POST, instance=review)
+        if form.is_valid():
+            form.save()
+            url = reverse('edit_review', kwargs={'review_id': review.id})
+            return redirect(f"{url}?saved=1")
+    else:
+        form = ReviewForm(instance=review)
+
+    saved = request.GET.get('saved')
+    return render(request, 'edit_review.html', {'form': form, 'saved': saved})
+
+
+@login_required
+def delete_review(request, review_id):
+    review = get_object_or_404(Review, id=review_id, user=request.user)
+    if request.method == 'POST':
+        review.delete()
+    return redirect('index')
+
+@login_required
+def update_review(request, review_id):
+    review = get_object_or_404(Review, id=review_id, user=request.user)
+    if request.method == 'POST':
+        review.text = request.POST['text']
+        review.save()
+    return redirect('home')

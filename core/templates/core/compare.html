@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block title %}Сравнение кредитов{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2><i class="bi bi-bar-chart"></i> Сравнение кредитных предложений</h2>
+    
+    <form method="get" action="{% url 'compare_detail' 0 0 %}" id="compare-form">
+        {% csrf_token %}
+        <div class="row g-3 mt-3">
+            <div class="col-md-5">
+                <label class="form-label">Первое предложение</label>
+                <select name="offer1" class="form-select" required>
+                    <option value="">Выберите предложение</option>
+                    {% for offer in offers %}
+                        <option value="{{ offer.id }}">
+                            {{ offer.bank.name }} - {{ offer.credit_type.name }} ({{ offer.rate }}%)
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="col-md-2 text-center">
+                <div class="h-100 d-flex align-items-center justify-content-center">
+                    <span class="h4">vs</span>
+                </div>
+            </div>
+            
+            <div class="col-md-5">
+                <label class="form-label">Второе предложение</label>
+                <select name="offer2" class="form-select" required>
+                    <option value="">Выберите предложение</option>
+                    {% for offer in offers %}
+                        <option value="{{ offer.id }}">
+                            {{ offer.bank.name }} - {{ offer.credit_type.name }} ({{ offer.rate }}%)
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="col-12">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-arrow-right-circle"></i> Сравнить
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+document.getElementById('compare-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const offer1 = this.elements['offer1'].value;
+    const offer2 = this.elements['offer2'].value;
+    
+    if (offer1 && offer2) {
+        window.location.href = `/compare/${offer1}/${offer2}/`;
+    } else {
+        alert('Пожалуйста, выберите оба кредитных предложения для сравнения');
+    }
+});
+</script>
+{% endblock %}

@@ -1,15 +1,39 @@
-{% extends 'base.html' %}
-{% block body_class %}page-offers{% endblock %}
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Все кредитные предложения{% endblock %}
+
 {% block content %}
-<h1 class="page-title">Кредитные предложения</h1>
-<div class="card-grid">
-  {% for offer in offers %}
-    <div class="card">
-      <h2>{{ offer.name }}</h2>
-      <p><strong>Банк:</strong> {{ offer.bank.name }}</p>
-      <p><strong>Ставка:</strong> {{ offer.rate }}%</p>
-      <a href="#" class="btn">Подробнее</a>
+<div class="container mt-4">
+    <h3 class="mb-4">Все кредитные предложения</h3>
+    <div class="row">
+        {% for offer in offers %}
+            <div class="col-md-4 mb-3">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body d-flex flex-column">
+                        <h5 class="card-title">{{ offer.bank.name }}</h5>
+                        <p class="card-text mb-4">
+                            {{ offer.credit_type.name }}<br>
+                            Ставка: {{ offer.rate }}%<br>
+                            Сумма: {{ offer.amount_min|floatformat:"0" }}–{{ offer.amount_max|floatformat:"0" }} ₽<br>
+                            Срок: {{ offer.term_min }}–{{ offer.term_max }} мес.
+                        </p>
+                        <div class="mt-auto">
+                            <a href="{% url 'add_to_favorites' offer.id %}"
+                               class="btn btn-outline-warning btn-sm w-100">
+                                В избранное
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <div class="col-12">
+                <div class="alert alert-secondary text-center">
+                    Нет доступных кредитных предложений.
+                </div>
+            </div>
+        {% endfor %}
     </div>
-  {% endfor %}
 </div>
 {% endblock %}

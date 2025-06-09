@@ -1,238 +1,30 @@
-{% extends 'base.html' %}
-{% load static %}
+<form method="post" action="{% url 'save_calculation' %}">
+    {% csrf_token %}
+    <input type="hidden" name="amount" id="form-amount">
+    <input type="hidden" name="term" id="form-term">
+    <input type="hidden" name="rate" id="form-rate">
+    <input type="hidden" name="result" id="form-result">
+    <input type="hidden" name="offer_id" value="{{ offer.id }}">
+    
+    <button type="submit" class="btn btn-primary mt-3" id="save-calculation-btn">
+        Сохранить расчет
+    </button>
+</form>
 
-{% block content %}
-    <div class="auth-status">
-        {% if user.is_authenticated %}
-            <div class="alert alert-success mb-3">DEBUG: Аутентифицирован как {{ user.username }} ({{ user.email }})</div>
-        {% else %}
-            <div class="alert alert-danger mb-3">DEBUG: Не авторизован</div>
-        {% endif %}
-    </div>
-    {# Сообщение о статусе аутентификации #}
-    {% if user.is_authenticated %}
-        <div class="alert alert-success">Вы вошли как: {{ user.username }}</div>
-    {% else %}
-        <div class="alert alert-warning">Вы не авторизованы</div>
-    {% endif %}
-
-    <div class="container mt-4">
-    <div class="row">
-        <div class="col-md-8">
-            <div class="card shadow-sm mb-4">
-                <div class="card-header bg-primary text-white">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h3 class="mb-0">{{ offer.bank.name }} - {{ offer.credit_type.name }}</h3>
-                        {% if user.is_authenticated %}
-                        <div>
-                            <a href="{% url 'toggle_favorite' offer.id %}" 
-                               class="btn btn-sm {% if is_favorite %}btn-warning{% else %}btn-outline-light{% endif %}">
-                                {% if is_favorite %}★ В избранном{% else %}☆ В избранное{% endif %}
-                            </a>
-                            <button class="btn btn-sm btn-outline-light compare-btn" 
-                                    data-offer-id="{{ offer.id }}">
-                                Сравнить
-                            </button>
-                        </div>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <ul class="list-group list-group-flush">
-                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <span>Процентная ставка:</span>
-                                    <span class="badge bg-primary rounded-pill">{{ offer.rate }}%</span>
-                                </li>
-                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <span>Срок кредита:</span>
-                                    <span>{{ offer.term_min }} - {{ offer.term_max }} мес.</span>
-                                </li>
-                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <span>Сумма:</span>
-                                    <span>{{ offer.amount_min|floatformat:"0" }} - {{ offer.amount_max|floatformat:"0" }} ₽</span>
-                                </li>
-                            </ul>
-                        </div>
-                        <div class="col-md-6">
-                            <ul class="list-group list-group-flush">
-                                <li class="list-group-item">
-                                    <strong>Тип кредита:</strong> {{ offer.credit_type.name }}
-                                </li>
-                                <li class="list-group-item">
-                                    <strong>Обновлено:</strong> {{ offer.updated_at|date:"d.m.Y" }}
-                                </li>
-                                <li class="list-group-item">
-                                    <strong>Банк:</strong> 
-                                    <a href="#bank-info" data-bs-toggle="collapse">Подробнее о банке</a>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card mb-4 collapse" id="bank-info">
-                <div class="card-header">
-                    <h5>О банке {{ offer.bank.name }}</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-4 text-center">
-                            <img src="{{ offer.bank.logo_url }}" alt="{{ offer.bank.name }}" class="img-fluid mb-3" style="max-height: 80px;">
-                        </div>
-                        <div class="col-md-8">
-                            <p><strong>Лицензия:</strong> {{ offer.bank.license_no }}</p>
-                            <p><strong>Контакты:</strong> {{ offer.bank.contact_info }}</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5>Отзывы о предложении</h5>
-                </div>
-                <div class="card-body">
-                    {% if reviews %}
-                        {% for review in reviews %}
-                        <div class="mb-3 border-bottom pb-3">
-                            <div class="d-flex justify-content-between">
-                                <h6>{{ review.user.username }}</h6>
-                                <div class="text-warning">
-                                    {% for i in "12345" %}
-                                        {% if forloop.counter <= review.rating %}★{% else %}☆{% endif %}
-                                    {% endfor %}
-                                </div>
-                            </div>
-                            <p>{{ review.text }}</p>
-                            <small class="text-muted">{{ review.created_at|date:"d.m.Y" }}</small>
-                        </div>
-                        {% endfor %}
-                    {% else %}
-                        <p class="text-muted">Пока нет отзывов</p>
-                    {% endif %}
-
-                    {% if user.is_authenticated %}
-                    <div class="mt-4">
-                        <h6>Оставить отзыв</h6>
-                        <form method="post" action="{% url 'add_review' offer.id %}">
-                            {% csrf_token %}
-                            <div class="mb-3">
-                                <select name="rating" class="form-select">
-                                    <option value="5">★★★★★ Отлично</option>
-                                    <option value="4">★★★★ Хорошо</option>
-                                    <option value="3">★★★ Удовлетворительно</option>
-                                    <option value="2">★★ Плохо</option>
-                                    <option value="1">★ Очень плохо</option>
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <textarea name="text" class="form-control" rows="3" placeholder="Ваш отзыв"></textarea>
-                            </div>
-                            <button type="submit" class="btn btn-primary">Отправить</button>
-                        </form>
-                    </div>
-                    {% else %}
-                    <div class="alert alert-info">
-                        <a href="{% url 'login' %}?next={{ request.path }}" class="btn btn-sm btn-outline-primary">Войдите</a>, чтобы оставить отзыв
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card shadow-sm sticky-top" style="top: 20px;">
-                <div class="card-header bg-success text-white">
-                    <h5 class="mb-0">Калькулятор платежа</h5>
-                </div>
-                <div class="card-body">
-                    <form id="payment-calculator">
-                        <div class="mb-3">
-                            <label class="form-label">Сумма кредита (₽)</label>
-                            <input type="number" class="form-control" id="amount" 
-                                   min="{{ offer.amount_min }}" max="{{ offer.amount_max }}" 
-                                   value="{{ offer.amount_min }}">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Срок (мес.)</label>
-                            <input type="number" class="form-control" id="term" 
-                                   min="{{ offer.term_min }}" max="{{ offer.term_max }}" 
-                                   value="{{ offer.term_min }}">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Ставка (%)</label>
-                            <input type="text" class="form-control" id="rate" value="{{ offer.rate }}" readonly>
-                        </div>
-                        <button type="button" class="btn btn-success w-100 mb-3" id="calculate-btn">
-                            Рассчитать
-                        </button>
-                        <div class="alert alert-info d-none" id="result">
-                            <strong>Ежемесячный платеж:</strong> <span id="payment">0</span> ₽
-                        </div>
-                        {% if user.is_authenticated %}
-                        <button type="button" class="btn btn-outline-primary w-100" id="save-calculation">
-                            Сохранить расчет
-                        </button>
-                        {% endif %}
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-<div class="modal fade" id="compareModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Сравнение кредитов</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body" id="compare-modal-body">
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
-                <a href="{% url 'compare' %}" class="btn btn-primary">Подробное сравнение</a>
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
-
-{% block scripts %}
 <script>
-$(document).ready(function() {
-    $('#calculate-btn').click(function() {
-        const amount = parseFloat($('#amount').val());
-        const term = parseInt($('#term').val());
-        const rate = parseFloat($('#rate').val()) / 100 / 12;
-        
-        const payment = (amount * rate * Math.pow(1 + rate, term)) / (Math.pow(1 + rate, term) - 1);
-        $('#payment').text(payment.toFixed(2));
-        $('#result').removeClass('d-none');
-    });
-    $('#save-calculation').click(function() {
-        const amount = $('#amount').val();
-        const term = $('#term').val();
-        const rate = $('#rate').val();
-        const result = $('#payment').text();
-        
-        $.post("{% url 'save_calculation' %}", {
-            amount: amount,
-            term: term,
-            rate: rate,
-            result: result,
-            csrfmiddlewaretoken: '{{ csrf_token }}'
-        }, function() {
-            alert('Расчет сохранен в вашу историю');
-        });
-    });
-    $('.compare-btn').click(function() {
-        const offerId = $(this).data('offer-id');
-        $('#compare-modal-body').load("{% url 'compare_modal' %}?offer_id=" + offerId);
-        $('#compareModal').modal('show');
-    });
-});
+function updateFormFields() {
+    const amount = $('#amount').val();
+    const term = $('#term').val();
+    const rate = $('#rate').val();
+    const payment = $('#payment').text();
+    
+    $('#form-amount').val(amount);
+    $('#form-term').val(term);
+    $('#form-rate').val(rate);
+    $('#form-result').val(payment);
+}
+
+$('#amount, #term, #rate').on('change input', updateFormFields);
+
+$(document).ready(updateFormFields);
 </script>
-{% endblock %}

@@ -1,235 +1,378 @@
 {% extends "base.html" %}
 {% load static %}
 {% block title %}Личный кабинет{% endblock %}
-
 {% block content %}
-<div class="container mt-5">
-    <div class="row">
-
-        <!-- Профиль пользователя -->
-        <div class="col-md-4 mb-4">
-            <div class="card text-center">
-                {% if user.avatar %}
-                    <img src="{{ user.avatar.url }}" class="card-img-top" alt="Аватар">
-                {% else %}
-                    <img src="{% static 'core/images/default_avatar.png' %}" class="card-img-top" alt="Аватар">
-                {% endif %}
-                <div class="card-body">
-                    <h4 class="card-title">{{ user.username }}</h4>
-                    <p>{{ user.email }}</p>
-                    <p>Зарегистрирован: {{ user.date_joined|date:"d.m.Y H:i" }}</p>
-                    <a href="{% url 'profile' %}" class="btn btn-primary">Редактировать профиль</a>
+<div class="container mt-4">
+    <div class="mb-4">
+        <a href="{% url 'home' %}" class="btn btn-outline-primary">
+            ← На главную
+        </a>
+    </div>
+    
+    <div class="row g-3">
+        <!-- Левая колонка -->
+        <div class="col-lg-4">
+            <!-- Компактный блок профиля -->
+            <div class="card shadow-sm" style="height: 180px;">
+                <div class="card-body text-center d-flex flex-column justify-content-between">
+                    <div>
+                        {% if user.avatar %}
+                            <img src="{{ user.avatar.url }}" class="rounded-circle mb-1" width="60" height="60" alt="Аватар">
+                        {% else %}
+                            <img src="{% static 'core/images/default_avatar.png' %}" class="rounded-circle mb-1" width="60" height="60" alt="Аватар">
+                        {% endif %}
+                        <h6 class="card-title mb-0">{{ user.username }}</h6>
+                        <p class="text-muted small mb-2">{{ user.email|truncatechars:20 }}</p>
+                    </div>
+                    <a href="{% url 'profile' %}" class="btn btn-outline-primary btn-sm w-100 py-1">Редактировать</a>
                 </div>
             </div>
-        </div>
+            
+            <!-- Финансовая сводка под профилем -->
+            <div class="card shadow-sm mt-3">
+                <div class="card-header bg-primary text-white py-1">
+                    <h6 class="mb-0 small"><i class="bi bi-graph-up"></i> Финансовая сводка</h6>
+                </div>
+                <div class="card-body p-2">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span>Доходы:</span>
+                        <span class="text-success fw-bold">+{{ income_total }} ₽</span>
+                    </div>
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span>Расходы:</span>
+                        <span class="text-danger fw-bold">-{{ expense_total }} ₽</span>
+                    </div>
+                    <hr class="my-1">
+                    <div class="d-flex justify-content-between small fw-bold">
+                        <span>Баланс:</span>
+                        <span class="{% if balance >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            {{ balance }} ₽
+                        </span>
+                    </div>
+                </div>
+            </div>
 
-        <!-- Бюджет -->
-        <div class="card mb-4">
-            <div class="card-header bg-info text-white">
-                <h5>Бюджет</h5>
-            </div>
-            <div class="card-body">
-                <a href="{% url 'budget_add' %}" class="btn btn-success btn-sm mb-3">+ Новая запись</a>
-
-                {% if budget_items %}
-                    <ul class="list-group">
-                        {% for item in budget_items %}
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                <span>
-                                    {{ item.name }}
-                                    <small class="text-muted">{{ item.get_item_type_display }}</small>
-                                </span>
-                                <span class="badge {% if item.item_type == 'income' %}bg-success{% else %}bg-danger{% endif %}">
-                                    {% if item.item_type == 'income' %}+{% else %}-{% endif %}{{ item.amount }}
-                                </span>
-                                <span>
-                                    <a href="{% url 'budget_edit' item.id %}" class="btn btn-outline-primary btn-sm">Редактировать</a>
-                                    <a href="#" data-bs-toggle="modal" data-bs-target="#deleteModal-{{ item.id }}" class="btn btn-outline-danger btn-sm">Удалить</a>
-                                </span>
-                            </li>
-                            <div class="modal fade" id="deleteModal-{{ item.id }}" tabindex="-1">
-                                <div class="modal-dialog">
-                                    <div class="modal-content">
-                                        <div class="modal-header">
-                                            <h5 class="modal-title">Удалить запись?</h5>
-                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                        </div>
-                                        <div class="modal-body">
-                                            Вы действительно хотите удалить "{{ item.name }}"?
-                                        </div>
-                                        <div class="modal-footer">
-                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                                            <a href="{% url 'budget_delete' item.id %}" class="btn btn-danger">Удалить</a>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p>Нет записей в бюджете.</p>
-                {% endif %}
-            </div>
-        </div>
-        <!-- График доходов/расходов -->
-        <div class="card mb-4">
-            <div class="card-header bg-light">
-                <h5>Доходы и расходы</h5>
-            </div>
-            <div class="card-body">
-                <canvas id="budgetChart" width="400" height="200"></canvas>
-            </div>
-        </div>
-
-        <script>
-            const ctx = document.getElementById('budgetChart').getContext('2d');
-            const budgetChart = new Chart(ctx, {
-                type: 'pie',
-                data: {
-                    labels: ['Доходы', 'Расходы'],
-                    datasets: [{
-                        label: 'Бюджет',
-                        data: [{{ income_total }}, {{ expense_total }}],
-                        backgroundColor: ['#4CAF50', '#F44336']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: {
-                            position: 'bottom'
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return `${context.label}: ${context.parsed} ₽`;
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        </script>
-        <!-- Статистика по кредитам -->
-        {% if favorites %}
-        <div class="card mb-4">
-            <div class="card-header bg-secondary text-white">
-                <h5>Статистика по кредитам</h5>
-            </div>
-            <div class="card-body">
-                <p>Избранных предложений: <strong>{{ favorites.count }}</strong></p>
-                {% with reviews=reviews|default:"" %}
-                    <p>Оставленных отзывов: <strong>{{ user.reviews.count }}</strong></p>
-                {% endwith %}
-            </div>
-        </div>
-        {% endif %}
-        <!-- История расчетов -->
-        {% if calculations %}
-        <div class="card mb-4">
-            <div class="card-header bg-dark text-white">
-                <h5>Последние расчёты</h5>
-            </div>
-            <div class="card-body">
-                <ul class="list-group">
-                    {% for calc in calculations %}
-                        <li class="list-group-item">
-                            {{ calc.amount }} ₽ / {{ calc.term }} мес → {{ calc.result }} ₽/мес
-                        </li>
-                    {% endfor %}
-                </ul>
-            </div>
-        </div>
-        {% endif %}
-            <!-- Избранные предложения -->
-            <div class="card mb-4">
-                <div class="card-header bg-warning text-white">
-                    <h5>Избранные кредиты</h5>
+            <!-- Избранные кредиты -->
+            <div class="card shadow-sm mt-3">
+                <div class="card-header bg-warning text-white py-2">
+                    <h6 class="mb-0"><i class="bi bi-star"></i> Избранные кредиты</h6>
                 </div>
                 <div class="card-body">
                     {% if favorites %}
-                        <ul class="list-group">
-                            {% for fav in favorites %}
-                                <li class="list-group-item">
-                                    {{ fav.offer.bank }} — {{ fav.offer.credit_type }} (ставка {{ fav.offer.rate }}%)
-                                </li>
-                            {% empty %}
-                                <p>Нет избранных предложений.</p>
-                            {% endfor %}
-                        </ul>
+                        <div style="max-height: 200px; overflow-y: auto;">
+                            <ul class="list-group list-group-flush">
+                                {% for fav in favorites|slice:":3" %}
+                                    <li class="list-group-item d-flex justify-content-between align-items-center py-1 px-2">
+                                        <div>
+                                            <strong class="d-block">{{ fav.offer.bank.name|truncatechars:15 }}</strong>
+                                            <small class="text-muted">{{ fav.offer.credit_type.name }} ({{ fav.offer.rate }}%)</small>
+                                        </div>
+                                        <a href="{% url 'offer_detail' fav.offer.id %}" class="btn btn-sm btn-outline-secondary">→</a>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        <div class="mt-2 text-center small">
+                            <span>Всего: {{ favorites_count }}</span>
+                        </div>
+                        <a href="{% url 'favorites' %}" class="btn btn-sm btn-outline-warning w-100 mt-1">Все избранные</a>
                     {% else %}
-                        <p>Вы еще не добавили предложения в избранное.</p>
+                        <div class="text-center text-muted py-2">
+                            <i class="bi bi-star" style="font-size: 1.5rem;"></i>
+                            <p class="mt-1 mb-2">Нет избранных</p>
+                            <a href="{% url 'all_offers' %}" class="btn btn-sm btn-warning">Найти кредит</a>
+                        </div>
                     {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Правая колонка -->
+        <div class="col-lg-8">
+            <!-- Анализ бюджета -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white py-2 d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0"><i class="bi bi-pie-chart"></i> Анализ бюджета</h6>
+                    <div>
+                        <a href="{% url 'budget_add' %}" class="btn btn-sm btn-light">Добавить</a>
+                        <a href="{% url 'budget' %}" class="btn btn-sm btn-outline-light">Все записи</a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-7">
+                            <div style="height: 200px;">
+                                <canvas id="budgetChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="col-md-5">
+                            <h6 class="text-center mb-2">Последние операции</h6>
+                            {% if budget_items %}
+                                <div class="list-group small" style="max-height: 200px; overflow-y: auto;">
+                                    {% for item in budget_items|slice:":5" %}
+                                        <div class="list-group-item d-flex justify-content-between align-items-center py-1 px-2">
+                                            <div>
+                                                <span class="d-block fw-bold">{{ item.name|truncatechars:15 }}</span>
+                                                <small class="text-muted">{{ item.date|date:"d.m.Y" }}</small>
+                                            </div>
+                                            <span class="badge {% if item.item_type == 'income' %}bg-success{% else %}bg-danger{% endif %}">
+                                                {% if item.item_type == 'income' %}+{% else %}-{% endif %}{{ item.amount }}
+                                            </span>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <div class="text-center text-muted py-2">
+                                    <i class="bi bi-wallet2" style="font-size: 1.5rem;"></i>
+                                    <p class="mt-1 mb-0">Нет операций</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- История расчетов -->
-            <div class="card mb-4">
-                <div class="card-header bg-secondary text-white">
-                    <h5>История расчетов</h5>
+            <div class="card shadow-sm mt-3">
+                <div class="card-header bg-secondary text-white py-2">
+                    <h6 class="mb-0"><i class="bi bi-calculator"></i> История расчетов</h6>
                 </div>
                 <div class="card-body">
                     {% if calculations %}
-                        <ul class="list-group">
-                            {% for calc in calculations %}
-                                <li class="list-group-item">
-                                    {{ calc.amount }} ₽, {{ calc.term }} мес. → {{ calc.result }} ₽/мес.
-                                </li>
-                            {% empty %}
-                                <p>Нет истории расчетов.</p>
-                            {% endfor %}
-                        </ul>
+                        <div style="max-height: 200px; overflow-y: auto;">
+                            <ul class="list-group list-group-flush">
+                                {% for calc in calculations|slice:":5" %}
+                                    <li class="list-group-item py-1 px-2">
+                                        <div class="d-flex justify-content-between">
+                                            <span>{{ calc.amount }} ₽ / {{ calc.term }} мес.</span>
+                                            <strong>{{ calc.result }} ₽/мес.</strong>
+                                        </div>
+                                        <small class="text-muted">{{ calc.created_at|date:"d.m.Y H:i" }}</small>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        <div class="mt-2 text-center small">
+                            <span>Общая сумма: {{ total_payments }} ₽</span>
+                        </div>
+                        <a href="{% url 'calculation_history' %}" class="btn btn-sm btn-outline-secondary w-100 mt-1">Вся история</a>
                     {% else %}
-                        <p>Вы еще не делали расчетов.</p>
+                        <div class="text-center text-muted py-2">
+                            <i class="bi bi-calculator" style="font-size: 1.5rem;"></i>
+                            <p class="mt-1 mb-0">Нет расчетов</p>
+                        </div>
                     {% endif %}
                 </div>
             </div>
 
-            <!-- Активный опрос -->
-            <div class="card mb-4">
-                <div class="card-header bg-primary text-white">
-                    <h5>Опрос дня</h5>
-                </div>
-                <div class="card-body">
-                    {% if active_poll %}
-                        <h6>{{ active_poll.question }}</h6>
-                        <form method="post" action="{% url 'vote_poll' active_poll.id %}">
-                            {% csrf_token %}
-                            {% for option in poll_options %}
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="choice" value="{{ option.id }}">
-                                    <label class="form-check-label">{{ option.text }}</label>
+            <!-- Калькуляторы -->
+            <div class="row mt-3 g-3">
+                <!-- Кредитный калькулятор -->
+                <div class="col-md-6">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-success text-white py-2">
+                            <h6 class="mb-0"><i class="bi bi-calculator"></i> Кредитный калькулятор</h6>
+                        </div>
+                        <div class="card-body">
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="calculate" value="true">
+                                <div class="mb-2">
+                                    <label class="form-label small">Сумма кредита (₽)</label>
+                                    <input type="number" class="form-control form-control-sm" name="amount" value="10000" step="1000" min="1000" required>
                                 </div>
-                            {% endfor %}
-                            <button type="submit" class="btn btn-sm btn-primary mt-2">Проголосовать</button>
-                        </form>
-                    {% else %}
-                        <p>На данный момент нет активных опросов.</p>
-                    {% endif %}
+                                <div class="mb-2">
+                                    <label class="form-label small">Срок (мес.)</label>
+                                    <input type="number" class="form-control form-control-sm" name="term" value="12" min="1" max="360" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label small">Ставка (%)</label>
+                                    <input type="number" class="form-control form-control-sm" name="rate" value="15.5" step="0.1" min="0.1" required>
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-sm w-100">Рассчитать</button>
+                            </form>
+                            {% if calculation_result %}
+                                <div class="alert alert-success mt-2 p-2">
+                                    <div class="d-flex justify-content-between small">
+                                        <span>Ежемесячный платеж:</span>
+                                        <strong>{{ calculation_result.monthly }} ₽</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between small">
+                                        <span>Общая выплата:</span>
+                                        <strong>{{ calculation_result.total }} ₽</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between small">
+                                        <span>Переплата:</span>
+                                        <strong>{{ calculation_result.overpayment }} ₽</strong>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Последние действия -->
-            <div class="card mb-4">
-                <div class="card-header bg-dark text-white">
-                    <h5>Ваша активность</h5>
-                </div>
-                <div class="card-body">
-                    {% if actions %}
-                        <ul class="list-group">
-                            {% for action in actions %}
-                                <li class="list-group-item">
-                                    <small>{{ action.timestamp|date:"d.m.Y H:i" }}</small> — {{ action.action_type }}
-                                </li>
-                            {% endfor %}
-                        </ul>
-                    {% else %}
-                        <p>Нет записей об активности.</p>
-                    {% endif %}
+                <!-- Сравнение кредитов -->
+                <div class="col-md-6">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-info text-white py-2">
+                            <h6 class="mb-0"><i class="bi bi-bar-chart"></i> Сравнение кредитов</h6>
+                        </div>
+                        <div class="card-body">
+                            <form id="credit-compare-form">
+                                {% csrf_token %}
+                                <div class="mb-2">
+                                    <label class="form-label small">Сумма (₽)</label>
+                                    <input type="number" class="form-control form-control-sm" id="compare_amount" name="amount" value="10000" step="1000" min="1000" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label small">Срок (мес.)</label>
+                                    <input type="number" class="form-control form-control-sm" id="compare_term" name="term" value="12" min="1" max="360" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label small">Кредит №1</label>
+                                    <select class="form-select form-select-sm" id="compare_offer1" required>
+                                        <option value="" selected disabled>Выберите</option>
+                                        {% for fav in favorites %}
+                                            <option value="{{ fav.offer.rate }}">
+                                                {{ fav.offer.bank.name }} ({{ fav.offer.rate }}%)
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label small">Кредит №2</label>
+                                    <select class="form-select form-select-sm" id="compare_offer2" required>
+                                        <option value="" selected disabled>Выберите</option>
+                                        {% for fav in favorites %}
+                                            <option value="{{ fav.offer.rate }}">
+                                                {{ fav.offer.bank.name }} ({{ fav.offer.rate }}%)
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-info btn-sm w-100">Сравнить</button>
+                            </form>
+                            <div id="compare-result" class="mt-2 small"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-
     </div>
 </div>
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+    // === График бюджета ===
+    const ctx = document.getElementById('budgetChart');
+    if (ctx) {
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Доходы', 'Расходы', 'Баланс'],
+                datasets: [{
+                    label: 'Сумма (₽)',
+                    data: [{{ income_total|default:0 }}, {{ expense_total|default:0 }}, {{ balance|default:0 }}],
+                    backgroundColor: [
+                        'rgba(75, 192, 192, 0.5)',
+                        'rgba(255, 99, 132, 0.5)',
+                        'rgba(54, 162, 235, 0.5)'
+                    ],
+                    borderColor: [
+                        'rgba(75, 192, 192, 1)',
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(54, 162, 235, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+    }
+
+    // === Обработчик сравнения кредитов ===
+    const compareForm = document.getElementById('credit-compare-form');
+    if (compareForm) {
+        compareForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            // Получение данных из формы
+            const amount = parseFloat(document.getElementById('compare_amount').value);
+            const term = parseInt(document.getElementById('compare_term').value);
+            const rate1 = parseFloat(document.getElementById('compare_offer1').value);
+            const rate2 = parseFloat(document.getElementById('compare_offer2').value);
+
+            // Проверка ввода
+            if (!rate1 || !rate2 || isNaN(amount) || isNaN(term)) {
+                document.getElementById('compare-result').innerHTML = `
+                    <div class="alert alert-warning p-2">
+                        Пожалуйста, заполните все поля и выберите оба кредита для сравнения
+                    </div>
+                `;
+                return;
+            }
+
+            // Расчёт ежемесячного платежа
+            function calculatePayment(amount, term, rate) {
+                const monthlyRate = rate / 12 / 100;
+                return (amount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -term));
+            }
+
+            const payment1 = calculatePayment(amount, term, rate1);
+            const payment2 = calculatePayment(amount, term, rate2);
+            const difference = Math.abs(payment1 - payment2);
+            const totalDifference = difference * term;
+
+            let recommendation = '';
+            if (payment1 < payment2) {
+                recommendation = 'Первый кредит выгоднее';
+            } else if (payment1 > payment2) {
+                recommendation = 'Второй кредит выгоднее';
+            } else {
+                recommendation = 'Условия кредитов одинаковы';
+            }
+
+            // Вывод результата
+            document.getElementById('compare-result').innerHTML = `
+                <div class="alert alert-info p-2">
+                    <div class="d-flex justify-content-between">
+                        <span>Ежемесячный платёж:</span>
+                        <strong>${payment1.toFixed(2)} ₽ vs ${payment2.toFixed(2)} ₽</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Разница платежей:</span>
+                        <strong>${difference.toFixed(2)} ₽/мес.</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Выгода за срок:</span>
+                        <strong>${totalDifference.toFixed(2)} ₽</strong>
+                    </div>
+                    <div class="d-flex justify-content-center mt-2">
+                        <span class="badge bg-success">${recommendation}</span>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+});
+</script>
+
+{% endblock %}
 {% endblock %}

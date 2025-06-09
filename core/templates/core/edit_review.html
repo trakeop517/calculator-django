@@ -1,0 +1,15 @@
+{% extends "base.html" %}  {# если у вас есть базовый шаблон, иначе уберите эту строку #}
+
+{% block content %}
+  <h2>Редактирование отзыва</h2>
+
+  {% if saved %}
+    <p style="color: green;">Изменения успешно сохранены!</p>
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Сохранить</button>
+  </form>
+{% endblock %}
